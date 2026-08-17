@@ -118,4 +118,4 @@ Please do not report vulnerabilities in public issues. See [SECURITY.md](SECURIT
 
 ## License
 
-No open-source license has been selected yet. Do not reuse or redistribute the code until a license is added.
+This project is licensed under the [MIT License](LICENSE).
