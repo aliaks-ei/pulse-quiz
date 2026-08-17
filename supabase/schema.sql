@@ -1,0 +1,6 @@
+-- Canonical Supabase bootstrap now lives in:
+--   supabase/migrations/20260817090000_production_schema_baseline.sql
+--   supabase/migrations/20260817090001_storage_and_realtime_bootstrap.sql
+--
+-- Apply schema changes with the Supabase migration workflow instead of
+-- pasting this file manually into SQL editor.

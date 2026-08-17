@@ -1,0 +1,250 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans:
+    "Manrope", "Helvetica Neue", ui-sans-serif, system-ui, sans-serif;
+  --font-display:
+    "Manrope", "Helvetica Neue", ui-sans-serif, system-ui, sans-serif;
+
+  --color-background: #f7f1ea;
+  --color-foreground: #2d221c;
+  --color-card: rgba(255, 250, 244, 0.8);
+  --color-card-foreground: #2d221c;
+  --color-popover: #fdf8f2;
+  --color-popover-foreground: #2d221c;
+  --color-primary: #cf7b52;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #ede2d6;
+  --color-secondary-foreground: #2d221c;
+  --color-muted: #ece2d7;
+  --color-muted-foreground: #7d6c60;
+  --color-accent: #f0d9c7;
+  --color-accent-foreground: #2d221c;
+  --color-destructive: #a34e4e;
+  --color-border: rgba(121, 94, 77, 0.12);
+  --color-input: rgba(255, 251, 246, 0.88);
+  --color-ring: rgba(207, 123, 82, 0.22);
+  --color-error: #9d4c4c;
+  --color-answer-amber: #cf7b52;
+  --color-answer-sage: #869983;
+  --color-answer-terracotta: #c98f72;
+  --color-answer-indigo: #6c635d;
+  --color-success-text: #51624f;
+  --color-score-track: rgba(131, 101, 79, 0.12);
+
+  --color-primary-8: rgba(207, 123, 82, 0.08);
+  --color-primary-12: rgba(207, 123, 82, 0.12);
+  --color-primary-16: rgba(207, 123, 82, 0.16);
+
+  --color-warm-border-soft: rgba(121, 94, 77, 0.1);
+  --color-warm-border: rgba(121, 94, 77, 0.12);
+  --color-warm-border-strong: rgba(121, 94, 77, 0.14);
+  --color-warm-ink: #7e6555;
+  --color-warm-ink-soft: #7d6c60;
+
+  --color-text-strong: #2d221c;
+  --color-text-body: #56463d;
+  --color-text-muted: #6d5b51;
+  --color-text-subtle: #837165;
+  --color-text-inverse-strong: #fffaf4;
+  --color-text-inverse-body: #f3e5d6;
+  --color-text-inverse-muted: #dbc7b7;
+
+  --radius: 1.35rem;
+  --radius-xs: 0.85rem;
+  --radius-sm: 1rem;
+  --radius-md: 1.3rem;
+  --radius-lg: 1.6rem;
+  --radius-xl: 2rem;
+  --radius-2xl: 2.35rem;
+
+  --text-chip: 0.68rem;
+}
+
+@utility text-inverse-body {
+  color: var(--color-text-inverse-body);
+}
+
+@utility text-inverse-muted {
+  color: var(--color-text-inverse-muted);
+}
+
+:root {
+  --paper-shadow: 0 28px 72px rgba(55, 37, 26, 0.12);
+  --paper-shadow-soft: 0 14px 34px rgba(55, 37, 26, 0.08);
+  --paper-shadow-strong: 0 26px 68px rgba(40, 26, 18, 0.18);
+  --paper-border: var(--color-warm-border-soft);
+  --paper-glow: rgba(207, 123, 82, 0.16);
+  --warm-ink-soft: var(--color-warm-ink-soft);
+  --text-strong: var(--color-text-strong);
+  --text-body: var(--color-text-body);
+  --text-muted: var(--color-text-muted);
+  --text-subtle: var(--color-text-subtle);
+  --text-inverse-strong: var(--color-text-inverse-strong);
+  --text-inverse-body: var(--color-text-inverse-body);
+  --text-inverse-muted: var(--color-text-inverse-muted);
+  --space-page-x-mobile: 1rem;
+  --space-page-x-tablet: 1.5rem;
+  --space-page-x-desktop: 2rem;
+  --space-section-mobile: 1.5rem;
+  --space-section-desktop: 2rem;
+  --space-surface-mobile: 1rem;
+  --space-surface-tablet: 1.25rem;
+  --space-surface-large: 1.5rem;
+}
+
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-border);
+  }
+
+  html {
+    color-scheme: light;
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    @apply min-h-screen bg-background font-sans text-foreground antialiased;
+    background:
+      radial-gradient(
+        circle at 10% 12%,
+        rgba(232, 188, 156, 0.18),
+        transparent 22%
+      ),
+      radial-gradient(
+        circle at 88% 14%,
+        rgba(173, 162, 150, 0.08),
+        transparent 20%
+      ),
+      radial-gradient(
+        circle at 82% 84%,
+        rgba(207, 123, 82, 0.08),
+        transparent 20%
+      ),
+      linear-gradient(180deg, #fbf7f2 0%, #f6efe6 100%);
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -2;
+    opacity: 0.18;
+    background-image: radial-gradient(
+      circle,
+      rgba(56, 42, 34, 0.14) 0.8px,
+      transparent 0.8px
+    );
+    background-size: 30px 30px;
+    mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.42), transparent 92%);
+  }
+
+  a {
+    @apply cursor-pointer text-inherit no-underline;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  button,
+  [role="button"],
+  input[type="radio"],
+  input[type="checkbox"],
+  input[type="file"] {
+    cursor: pointer;
+  }
+
+  ::selection {
+    background: rgba(207, 123, 82, 0.18);
+    color: #2d221c;
+  }
+}
+
+@layer components {
+  .stage-grid {
+    background-image: radial-gradient(
+      circle,
+      rgba(255, 255, 255, 0.14) 1px,
+      transparent 1px
+    );
+    background-size: 38px 38px;
+    mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.4), transparent 88%);
+  }
+
+  .family-stage {
+    @apply relative overflow-hidden rounded-[2rem] border;
+    border-color: rgba(255, 255, 255, 0.1);
+    background:
+      radial-gradient(
+        circle at top left,
+        rgba(255, 228, 206, 0.1),
+        transparent 28%
+      ),
+      radial-gradient(
+        circle at 85% 18%,
+        rgba(180, 191, 178, 0.08),
+        transparent 18%
+      ),
+      linear-gradient(180deg, rgba(70, 50, 42, 0.82), rgba(54, 40, 34, 0.72));
+    backdrop-filter: blur(12px);
+    box-shadow: var(--paper-shadow);
+    color: var(--color-text-inverse-strong);
+  }
+
+  .soft-pill {
+    @apply inline-flex items-center rounded-full border px-4 py-2 text-sm font-semibold;
+    border-color: var(--color-warm-border);
+    background: rgba(255, 255, 255, 0.82);
+    color: var(--color-text-muted);
+  }
+
+  .score-row {
+    @apply relative overflow-hidden rounded-[var(--radius-md)] border px-4 py-3.5;
+    --score-fill: 0%;
+    border-color: var(--color-warm-border-soft);
+    background: linear-gradient(
+      90deg,
+      rgba(207, 123, 82, 0.08) 0 var(--score-fill),
+      rgba(255, 250, 244, 0.9) var(--score-fill) 100%
+    );
+    box-shadow: 0 8px 18px rgba(55, 37, 26, 0.06);
+  }
+
+  .app-title {
+    font-size: clamp(1.875rem, 4vw, 2.5rem);
+    line-height: 0.98;
+    letter-spacing: -0.05em;
+  }
+
+  .hero-title {
+    font-size: clamp(2.5rem, 7vw, 4.5rem);
+    line-height: 0.92;
+    letter-spacing: -0.065em;
+  }
+
+  .gameplay-title {
+    font-size: clamp(2rem, 5vw, 3rem);
+    line-height: 0.96;
+    letter-spacing: -0.055em;
+  }
+
+  .metric-value {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    line-height: 0.95;
+    letter-spacing: -0.06em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-block {
+    animation: none;
+  }
+}
