@@ -17,7 +17,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.49.4",
+    "@supabase/supabase-js": "^2.112.3",
     "@vueuse/core": "^14.2.1",
     "clsx": "^2.1.1",
     "lucide-vue-next": "^0.511.0",
