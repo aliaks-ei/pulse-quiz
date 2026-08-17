@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",
-    "@vueuse/core": "^14.2.1",
+    "@vueuse/core": "^14.4.0",
     "clsx": "^2.1.1",
     "lucide-vue-next": "^0.511.0",
     "motion-v": "^2.2.0",
