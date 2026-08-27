@@ -82,6 +82,20 @@ v1/octopus.webp
 
 The `player-avatars` bucket is private. The `upload-avatar` Edge Function accepts a browser-normalized WebP, validates its file signature and size, and returns an opaque asset ID. Only people in the same live session can request a signed URL for that avatar.
 
+## Question media
+
+Question media is stored in a private Cloudflare R2 bucket, not in Supabase Storage. Create the bucket and an S3 API token with object read and write on it, then set the Edge Function secrets:
+
+```bash
+npx supabase secrets set \
+  R2_ACCOUNT_ID=your-cloudflare-account-id \
+  R2_ACCESS_KEY_ID=your-r2-access-key-id \
+  R2_SECRET_ACCESS_KEY=your-r2-secret-access-key \
+  R2_BUCKET=question-media
+```
+
+The `upload-question-media` Edge Function is the only writer. It validates the file signature against the declared type, enforces the 25 MB per-file limit, and rejects the upload when the account is over its storage quota. The quota is `private.plan_definitions.max_storage_bytes`, 500 MB on the free plan, so raising it is a row update rather than a deploy.
+
 ## Edge Functions
 
 Deploy the tracked functions after setting required secrets:
@@ -89,9 +103,10 @@ Deploy the tracked functions after setting required secrets:
 ```bash
 npx supabase functions deploy translate-quiz
 npx supabase functions deploy upload-avatar
+npx supabase functions deploy upload-question-media
 ```
 
-`translate-quiz` requires `OPENAI_API_KEY`; `upload-avatar` uses the Supabase runtime service-role secret and must retain JWT verification.
+`translate-quiz` requires `OPENAI_API_KEY`; `upload-question-media` requires the `R2_*` secrets above. Both, along with `upload-avatar`, use the Supabase runtime service-role secret and must retain JWT verification.
 
 ## Verification
 

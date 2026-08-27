@@ -173,6 +173,7 @@ export const ruManagementMessages = {
     backToQuiz: "Назад к квизу",
     loadError: "Не удалось загрузить этот квиз.",
     uploadError: "Не удалось загрузить медиа.",
+    storageWarning: "Хранилище медиа: {used} МБ из {limit} МБ.",
     removeMediaError: "Не удалось удалить медиа.",
     validation: {
       addQuizTitle: "Добавьте название квиза.",

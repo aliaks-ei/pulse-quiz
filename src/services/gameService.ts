@@ -453,6 +453,8 @@ export const gameService = {
       planKey: string
       maxActiveRoomsPerAccount: number | null
       maxPlayersPerRoom: number | null
+      maxStorageBytes: number | null
+      usedStorageBytes: number
     }
   },
 

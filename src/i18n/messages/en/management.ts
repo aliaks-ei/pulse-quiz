@@ -169,6 +169,7 @@ export const enManagementMessages = {
     backToQuiz: "Back to Quiz",
     loadError: "Unable to load this quiz.",
     uploadError: "Unable to upload media.",
+    storageWarning: "Media storage is {used} MB of {limit} MB.",
     removeMediaError: "Unable to remove media.",
     validation: {
       addQuizTitle: "Add a quiz title.",

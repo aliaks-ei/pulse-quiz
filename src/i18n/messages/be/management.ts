@@ -176,6 +176,7 @@ export const beManagementMessages = {
     backToQuiz: "Назад да квіза",
     loadError: "Не ўдалося загрузіць гэты квіз.",
     uploadError: "Не ўдалося загрузіць медыя.",
+    storageWarning: "Сховішча медыя: {used} МБ з {limit} МБ.",
     removeMediaError: "Не ўдалося выдаліць медыя.",
     validation: {
       addQuizTitle: "Дадайце назву квіза.",

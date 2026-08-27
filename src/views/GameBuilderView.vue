@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue"
+import { computed, onMounted, ref, watch } from "vue"
 import { ArrowDown, ArrowUp, GripVertical } from "lucide-vue-next"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
@@ -46,6 +46,7 @@ const router = useRouter()
 const isLoadingGame = ref(false)
 const loadError = ref<string | null>(null)
 const uploadError = ref<string | null>(null)
+const storageUsage = ref<{ usedBytes: number; limitBytes: number } | null>(null)
 const activeQuestionId = ref("")
 const translationModalOpen = ref(false)
 const translationDisplayTotal = ref(0)
@@ -298,6 +299,41 @@ const staleByLocale = computed(() =>
   localeRecord((stat) => stat.staleCount > 0, false),
 )
 
+const STORAGE_WARNING_RATIO = 0.8
+
+// Only surfaced once the account is close to its limit, so a host who is
+// nowhere near the cap never sees a meter they do not need.
+const storageWarning = computed(() => {
+  const usage = storageUsage.value
+  if (!usage || usage.limitBytes <= 0) return null
+  if (usage.usedBytes < usage.limitBytes * STORAGE_WARNING_RATIO) return null
+
+  return t("gameBuilderView.storageWarning", {
+    used: formatMegabytes(usage.usedBytes),
+    limit: formatMegabytes(usage.limitBytes),
+  })
+})
+
+function formatMegabytes(bytes: number) {
+  return Math.round(bytes / 1024 / 1024)
+}
+
+async function refreshStorageUsage() {
+  try {
+    const entitlements = await gameService.getMyEntitlements()
+    storageUsage.value = entitlements.maxStorageBytes
+      ? {
+          usedBytes: entitlements.usedStorageBytes,
+          limitBytes: entitlements.maxStorageBytes,
+        }
+      : null
+  } catch {
+    storageUsage.value = null
+  }
+}
+
+onMounted(refreshStorageUsage)
+
 watch(
   editingGameId,
   async () => {
@@ -406,6 +442,8 @@ async function uploadMediaFile(
     if (previousMedia?.path && previousMedia.path !== media.path) {
       void gameService.deleteUploadedMedia([previousMedia.path])
     }
+
+    void refreshStorageUsage()
   } catch (error) {
     uploadError.value =
       error instanceof Error ? error.message : t("gameBuilderView.uploadError")
@@ -1501,6 +1539,13 @@ async function onSave() {
                 :rows="4"
               />
             </div>
+
+            <p
+              v-if="storageWarning"
+              class="mt-6 rounded-[1.35rem] border border-warm-border bg-white/70 px-4 py-3 text-sm text-[color:var(--warm-ink-soft)]"
+            >
+              {{ storageWarning }}
+            </p>
 
             <p
               v-if="uploadError"

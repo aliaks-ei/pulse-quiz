@@ -172,6 +172,7 @@ export const plManagementMessages = {
     backToQuiz: "Wróć do quizu",
     loadError: "Nie udało się wczytać tego quizu.",
     uploadError: "Nie udało się przesłać mediów.",
+    storageWarning: "Pamięć na media: {used} MB z {limit} MB.",
     removeMediaError: "Nie udało się usunąć mediów.",
     validation: {
       addQuizTitle: "Dodaj tytuł quizu.",

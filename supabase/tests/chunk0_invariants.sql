@@ -70,7 +70,8 @@ begin
 
   if entitlement.plan_key <> 'free'
     or entitlement.max_active_rooms_per_account <> 1
-    or entitlement.max_players_per_room <> 10 then
+    or entitlement.max_players_per_room <> 10
+    or entitlement.max_storage_bytes <> 524288000 then
     raise exception 'Free entitlement defaults do not match production';
   end if;
 
