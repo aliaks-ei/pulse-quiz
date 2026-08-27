@@ -43,6 +43,9 @@ Run `npm run type-check`, `npm run lint`, and `npm run format` after code change
 - [`src/types/db-rows.ts`](src/types/db-rows.ts): typed Supabase row shapes used when normalizing RPC and query results
 - [`src/assets/main.css`](src/assets/main.css): global theme tokens and shared utility classes
 - [`supabase/migrations`](supabase/migrations): canonical database schema, RPCs, policies, storage, and realtime bootstrap
+- [`supabase/tests`](supabase/tests): SQL invariants the `Database` workflow runs against a database rebuilt from migrations
+- [`scripts`](scripts): one-shot maintenance scripts run with a service-role key
+- [`workers/media-reaper`](workers/media-reaper): Cloudflare Cron Trigger that deletes R2 objects the retention jobs marked
 
 ## Repo Conventions
 
@@ -61,6 +64,7 @@ Run `npm run type-check`, `npm run lint`, and `npm run format` after code change
   changes; never leave changes applied only through the Dashboard SQL editor.
   The `Database` GitHub Actions workflow enforces this by rebuilding the local
   database from migrations and checking the production schema invariants.
+- Retention jobs live in `private` and ship report-only. Never arm one, or shorten its window, without reading a cycle of `private.retention_runs` first: both deletions are irreversible.
 - Anonymous auth is expected and is initialized on app mount.
 - Invite links point to live sessions, not reusable quiz templates.
 - Resume behavior is same-browser only and relies on both Supabase auth persistence and local storage.

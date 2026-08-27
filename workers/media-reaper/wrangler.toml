@@ -1,0 +1,20 @@
+name = "pulse-quiz-media-reaper"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+
+# Twenty minutes after the last pg_cron retention job marks its assets, so a
+# night's markings are reaped the same night.
+[triggers]
+crons = ["50 3 * * *"]
+
+[[r2_buckets]]
+binding = "QUESTION_MEDIA"
+bucket_name = "pulse-quiz-question-media"
+
+# Must match the bucket above: the Worker skips rows from any other bucket.
+[vars]
+R2_BUCKET = "pulse-quiz-question-media"
+
+# SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are secrets, set with
+# `npx wrangler secret put` from this directory. The service-role key never
+# belongs in a tracked file.

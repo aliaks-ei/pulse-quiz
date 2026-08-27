@@ -24,3 +24,9 @@ jobs:
           postgresql://postgres:postgres@127.0.0.1:54322/postgres
           --set ON_ERROR_STOP=1
           --file supabase/tests/chunk0_invariants.sql
+      - name: Assert retention jobs take the right rows
+        run: >-
+          psql
+          postgresql://postgres:postgres@127.0.0.1:54322/postgres
+          --set ON_ERROR_STOP=1
+          --file supabase/tests/retention_jobs.sql

@@ -8,6 +8,8 @@ declare
     'invite_lookup_attempts',
     'plan_definitions',
     'question_type_catalog',
+    'retention_runs',
+    'retention_settings',
     'translation_quota_windows',
     'usage_counters'
   ];

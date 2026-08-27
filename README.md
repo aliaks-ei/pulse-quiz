@@ -111,6 +111,41 @@ The run is resumable and safe to repeat: anything already in R2 is skipped, and 
 
 The `media-url` Edge Function is the only reader. It presigns R2 objects for two hours after `public.authorize_media_paths` confirms the caller owns the quiz or holds a player row in one of its unfinished sessions. Assets still held in Supabase Storage come back in the response's `legacy` list, and `src/lib/mediaUrl.ts` falls back to the legacy public URL for those and logs each fallback.
 
+## Retention
+
+Three `pg_cron` jobs keep the database and the media bucket from growing without bound. Each one is defined in `supabase/migrations/*_retention_jobs.sql` and reads its window and its arming switch from `private.retention_settings`:
+
+| Job                      | Takes                                                             | Window  |
+| ------------------------ | ----------------------------------------------------------------- | ------- |
+| `purge_trashed_games`    | Quizzes trashed and never restored, with their media marked first | 30 days |
+| `expire_anonymous_users` | Anonymous accounts with no player row, no quiz and no asset       | 15 days |
+| `mark_detached_media`    | Assets no question references, marked for the reaper              | 1 day   |
+
+Every job ships **report-only**. It runs on schedule, writes what it matched to `private.retention_runs`, and deletes nothing until its row is armed. Read a cycle or two first, then arm it:
+
+```sql
+select job_key, ran_at, matched_count, sample
+from private.retention_runs
+order by ran_at desc
+limit 20;
+
+update private.retention_settings set is_armed = true, updated_at = now()
+where job_key = 'purge_trashed_games';
+```
+
+Both deletions are irreversible. Changing a window is the same kind of update, so neither the schedule nor the retention period needs a deploy.
+
+### The media reaper
+
+Postgres cannot reach R2, so no job deletes an object. `workers/media-reaper` is a Cloudflare Cron Trigger with the bucket binding: it reads the rows marked `scheduled_for_deletion`, deletes the objects, then deletes the rows. Rows from the legacy Supabase bucket are counted and left for `npm run media:reap-orphans`.
+
+```bash
+cd workers/media-reaper
+npx wrangler secret put SUPABASE_URL
+npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+npx wrangler deploy
+```
+
 ## Edge Functions
 
 Deploy the tracked functions after setting required secrets:
@@ -141,6 +176,7 @@ npm run build
 - Keep production and staging Supabase projects separate.
 - Set OpenAI quotas and spend alerts.
 - Enable GitHub branch protection, Dependabot, secret scanning, push protection and code scanning before opening the repository publicly.
+- Read one cycle of `private.retention_runs` before arming a retention job, and deploy `workers/media-reaper` before arming `mark_detached_media`.
 - Run a two-browser host/player smoke test after each database or Realtime change.
 
 ## Contributing and security
