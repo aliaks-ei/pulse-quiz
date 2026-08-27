@@ -59,7 +59,7 @@ Deno.serve(async (request) => {
   const accountId = Deno.env.get("R2_ACCOUNT_ID")
   const accessKeyId = Deno.env.get("R2_ACCESS_KEY_ID")
   const secretAccessKey = Deno.env.get("R2_SECRET_ACCESS_KEY")
-  const bucket = Deno.env.get("R2_BUCKET") ?? "question-media"
+  const bucket = Deno.env.get("R2_BUCKET") ?? "pulse-quiz-question-media"
 
   if (
     !supabaseUrl ||
