@@ -14,10 +14,12 @@ import {
 import {
   mockCalls,
   resetMockSupabase,
+  setFunctionResult,
   setRpc,
   setRpcError,
   setTableResult,
 } from "@/test/mock-supabase"
+import { clearMediaUrlCache } from "@/lib/mediaUrl"
 import { makeSnapshot } from "@/test/factories"
 import { withTestPinia } from "@/test/pinia"
 import type { GameWithQuestionsRow } from "@/types/dbRows"
@@ -57,24 +59,40 @@ function gameRow(
 
 beforeEach(() => {
   resetMockSupabase()
+  clearMediaUrlCache()
 })
+
+function presigned(paths: string[]) {
+  const expiresAt = Math.floor(Date.now() / 1000) + 2 * 60 * 60
+  return {
+    data: {
+      urls: Object.fromEntries(
+        paths.map((path) => [
+          path,
+          { url: `https://r2.example/${path}?signed`, expiresAt },
+        ]),
+      ),
+      legacy: [],
+    },
+  }
+}
 
 afterEach(() => {
   vi.restoreAllMocks()
 })
 
 describe("normalizeSnapshot", () => {
-  it("keeps reveal-phase fields and fills derived counts", () => {
-    const snapshot = normalizeSnapshot(makeSnapshot())
+  it("keeps reveal-phase fields and fills derived counts", async () => {
+    const snapshot = await normalizeSnapshot(makeSnapshot())
 
     expect(snapshot.game.questionCount).toBe(1)
     expect(snapshot.game.sectionCount).toBe(1)
     expect(snapshot.currentQuestion?.correctOptionId).toBe("option-2")
   })
 
-  it("derives sectionCount from sections when absent", () => {
+  it("derives sectionCount from sections when absent", async () => {
     const base = makeSnapshot()
-    const snapshot = normalizeSnapshot({
+    const snapshot = await normalizeSnapshot({
       ...base,
       game: { ...base.game, sectionCount: undefined as unknown as number },
     })
@@ -201,6 +219,65 @@ describe("deleteGame", () => {
     setRpc("restore_game_from_trash", { restored: true })
     const result = await gameService.restoreGame("game-1")
     expect(result.restored).toBe(true)
+  })
+})
+
+describe("uploadQuestionMedia", () => {
+  it("posts the file to the upload gate and presigns the stored path", async () => {
+    setFunctionResult("upload-question-media", {
+      data: { assetId: "asset-1", path: "assets/asset-1.mp3", kind: "audio" },
+    })
+    setFunctionResult("media-url", presigned(["assets/asset-1.mp3"]))
+
+    const media = await gameService.uploadQuestionMedia(
+      new File(["x"], "a.mp3", { type: "audio/mpeg" }),
+    )
+
+    expect(media).toMatchObject({
+      kind: "audio",
+      path: "assets/asset-1.mp3",
+      publicUrl: "https://r2.example/assets/asset-1.mp3?signed",
+    })
+    expect(mockCalls.storage.some((call) => call.name === "upload")).toBe(false)
+  })
+
+  it("surfaces the quota message the gate returns", async () => {
+    setFunctionResult("upload-question-media", {
+      error: Object.assign(new Error("Edge Function returned 409"), {
+        context: new Response(
+          JSON.stringify({
+            error: "Storage quota reached",
+            usedBytes: 524288000,
+            limitBytes: 524288000,
+          }),
+          { status: 409 },
+        ),
+      }),
+    })
+
+    await expect(
+      gameService.uploadQuestionMedia(
+        new File(["x"], "a.mp3", { type: "audio/mpeg" }),
+      ),
+    ).rejects.toThrow("Storage quota reached: 500 MB of 500 MB used.")
+  })
+})
+
+describe("deleteUploadedMedia", () => {
+  it("marks the assets for the reaper instead of deleting objects", async () => {
+    setRpc("schedule_media_deletion", 1)
+    await gameService.deleteUploadedMedia(["assets/a.png"])
+
+    expect(mockCalls.rpc.at(-1)).toMatchObject({
+      name: "schedule_media_deletion",
+      params: { p_paths: ["assets/a.png"] },
+    })
+    expect(mockCalls.storage.some((call) => call.name === "remove")).toBe(false)
+  })
+
+  it("does nothing for an empty list", async () => {
+    await gameService.deleteUploadedMedia([])
+    expect(mockCalls.rpc).toEqual([])
   })
 })
 

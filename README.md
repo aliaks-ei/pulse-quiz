@@ -96,6 +96,19 @@ npx supabase secrets set \
 
 The `upload-question-media` Edge Function is the only writer. It validates the file signature against the declared type, enforces the 25 MB per-file limit, and rejects the upload when the account is over its storage quota. The quota is `private.plan_definitions.max_storage_bytes`, 500 MB on the free plan, so raising it is a row update rather than a deploy.
 
+Media a question no longer uses is not deleted from the browser. `gameService.deleteUploadedMedia` calls `public.schedule_media_deletion`, which marks the asset `scheduled_for_deletion`: that frees the account's quota straight away and leaves the object itself to the reaper.
+
+### Moving existing media to R2
+
+`scripts/migrate-media-to-r2.ts` copies the objects a question still references out of the legacy `question-media` Supabase bucket, keeping the object path unchanged, verifying each copy by MD5 and size, and repointing its `media_assets` row. Orphans are never copied, so run `npm run media:reap-orphans -- --apply` first. It needs `SUPABASE_SERVICE_ROLE_KEY` and the `R2_*` values in `.env`:
+
+```bash
+npm run media:migrate-to-r2            # dry run: lists what would move
+npm run media:migrate-to-r2 -- --apply # copies and verifies
+```
+
+The run is resumable and safe to repeat: anything already in R2 is skipped, and a half-finished run still plays, because unmoved assets keep resolving through the legacy fallback. Once the fallback has logged nothing for a week, make the Supabase `question-media` bucket private.
+
 The `media-url` Edge Function is the only reader. It presigns R2 objects for two hours after `public.authorize_media_paths` confirms the caller owns the quiz or holds a player row in one of its unfinished sessions. Assets still held in Supabase Storage come back in the response's `legacy` list, and `src/lib/mediaUrl.ts` falls back to the legacy public URL for those and logs each fallback.
 
 ## Edge Functions

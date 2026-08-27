@@ -30,6 +30,7 @@ declare
     'pause_session_flow(uuid)',
     'restore_game_from_trash(uuid)',
     'resume_session_flow(uuid)',
+    'schedule_media_deletion(text[])',
     'set_game_answer_reveal_settings(uuid,integer,boolean)',
     'set_game_primary_locale(uuid,text)',
     'start_gameplay(uuid)',

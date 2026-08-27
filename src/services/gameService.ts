@@ -3,6 +3,7 @@ import { normalizeAvatarImage } from "@/lib/avatarUpload"
 import { detectMediaKind } from "@/lib/mediaKind"
 import { defaultAppLocale, type AppLocale } from "@/i18n/locale"
 import { readMediaDimensions } from "@/lib/mediaDimensions"
+import { resolveMediaUrls, type MediaUrlOptions } from "@/lib/mediaUrl"
 import { supabase } from "@/services/supabase"
 import type {
   GameQuestionRow,
@@ -31,7 +32,6 @@ import {
   DEFAULT_SECTION_INTERMISSION_SECONDS,
 } from "@/types/domain"
 
-const QUESTION_MEDIA_BUCKET = "question-media"
 const MAX_QUESTION_MEDIA_BYTES = 25 * 1024 * 1024
 const ALLOWED_MEDIA_TYPE_PREFIXES = ["image/", "audio/", "video/"] as const
 
@@ -46,17 +46,6 @@ function isAllowedQuestionMediaType(file: File) {
   )
 }
 
-function sanitizeStorageFileName(name: string) {
-  const normalized = name
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .toLowerCase()
-
-  return normalized || "media"
-}
-
 export function validateQuestionMediaFile(file: File) {
   if (!isAllowedQuestionMediaType(file)) {
     throw new Error("Upload an image, audio, or video file.")
@@ -67,17 +56,83 @@ export function validateQuestionMediaFile(file: File) {
   }
 }
 
-function normalizeQuestionMedia(media: QuestionMedia | null) {
+type UploadedQuestionMedia = {
+  assetId: string
+  path: string
+  kind: QuestionMedia["kind"]
+  width?: number
+  height?: number
+}
+
+function formatMegabytes(bytes: number) {
+  return `${Math.round(bytes / 1024 / 1024)} MB`
+}
+
+// The upload gate answers with a JSON body the browser should show verbatim,
+// so unwrap it rather than surfacing supabase-js's generic status message.
+async function readFunctionError(error: unknown): Promise<Error> {
+  const fallback =
+    error instanceof Error ? error : new Error("Media upload failed.")
+  const response = (error as { context?: unknown } | null)?.context
+  if (!(response instanceof Response)) return fallback
+
+  let body: {
+    error?: unknown
+    usedBytes?: unknown
+    limitBytes?: unknown
+  } = {}
+
+  try {
+    body = await response.clone().json()
+  } catch {
+    return fallback
+  }
+
+  if (
+    response.status === 409 &&
+    typeof body.usedBytes === "number" &&
+    typeof body.limitBytes === "number"
+  ) {
+    return new Error(
+      `Storage quota reached: ${formatMegabytes(body.usedBytes)} of ${formatMegabytes(body.limitBytes)} used. Remove some media first.`,
+    )
+  }
+
+  return typeof body.error === "string" ? new Error(body.error) : fallback
+}
+
+// Question media lives in a private bucket, so a row carries a path and the
+// playable URL is minted per caller. Paths are gathered per game or per snapshot
+// and resolved in one batch, then attached synchronously from the result.
+function collectMediaPaths(
+  medias: Array<QuestionMedia | null | undefined>,
+): string[] {
+  const paths = new Set<string>()
+
+  for (const media of medias) {
+    if (media?.path && !media.publicUrl) paths.add(media.path)
+  }
+
+  return [...paths]
+}
+
+function attachMediaUrl(
+  media: QuestionMedia | null,
+  urls: Map<string, string>,
+) {
   if (!media?.path || media.publicUrl) return media
 
-  const { data } = supabase.storage
-    .from(QUESTION_MEDIA_BUCKET)
-    .getPublicUrl(media.path)
+  const publicUrl = urls.get(media.path)
+  return publicUrl ? { ...media, publicUrl } : media
+}
 
-  return {
-    ...media,
-    publicUrl: data.publicUrl,
-  }
+async function resolveMedia(
+  medias: Array<QuestionMedia | null | undefined>,
+  options: MediaUrlOptions = {},
+) {
+  const paths = collectMediaPaths(medias)
+  if (!paths.length) return new Map<string, string>()
+  return resolveMediaUrls(paths, options)
 }
 
 function normalizeI18nMap(row: I18nMapRow | undefined): I18nMap {
@@ -115,7 +170,10 @@ function denormalizeI18nMap(
   return result
 }
 
-function normalizeQuestionRecord(question: GameQuestionRow) {
+function normalizeQuestionRecord(
+  question: GameQuestionRow,
+  urls: Map<string, string>,
+) {
   return {
     id: question.id,
     type: "single_choice" as const,
@@ -126,8 +184,8 @@ function normalizeQuestionRecord(question: GameQuestionRow) {
     durationSeconds: question.duration_seconds,
     points: question.points ?? DEFAULT_POINTS,
     correctOptionId: question.correct_option_id,
-    media: normalizeQuestionMedia(question.media),
-    revealMedia: normalizeQuestionMedia(question.reveal_media),
+    media: attachMediaUrl(question.media, urls),
+    revealMedia: attachMediaUrl(question.reveal_media, urls),
     revealText: question.reveal_text,
     revealTextI18n: normalizeI18nMap(question.reveal_text_i18n),
     options: (question.options ?? []).map((option) => ({
@@ -184,11 +242,14 @@ function deriveSections(
   ]
 }
 
-function normalizeGameRecord(row: GameWithQuestionsRow): Game {
+function normalizeGameRecord(
+  row: GameWithQuestionsRow,
+  urls: Map<string, string>,
+): Game {
   const questions = (row.questions ?? [])
     .slice()
     .sort((a, b) => a.position - b.position)
-    .map(normalizeQuestionRecord)
+    .map((question) => normalizeQuestionRecord(question, urls))
 
   return {
     id: row.id,
@@ -208,6 +269,21 @@ function normalizeGameRecord(row: GameWithQuestionsRow): Game {
     questions,
     sections: deriveSections(questions, row.sections),
   }
+}
+
+async function normalizeGameRecords(
+  rows: GameWithQuestionsRow[],
+): Promise<Game[]> {
+  const urls = await resolveMedia(
+    rows.flatMap((row) =>
+      (row.questions ?? []).flatMap((question) => [
+        question.media,
+        question.reveal_media,
+      ]),
+    ),
+  )
+
+  return rows.map((row) => normalizeGameRecord(row, urls))
 }
 
 function normalizeGameStatusRecord(row: GameStatusRow): GameStatusSummary {
@@ -267,14 +343,21 @@ export function isInvalidInviteError(error: unknown): boolean {
   )
 }
 
-export function normalizeSnapshot(snapshot: SessionSnapshot): SessionSnapshot {
-  const currentQuestion = snapshot.currentQuestion
+export async function normalizeSnapshot(
+  snapshot: SessionSnapshot,
+): Promise<SessionSnapshot> {
+  const question = snapshot.currentQuestion
+  // The session id narrows the participant check, so a player only ever gets
+  // URLs for the room they are actually in.
+  const urls = await resolveMedia([question?.media, question?.revealMedia], {
+    sessionId: snapshot.session?.id ?? null,
+  })
+
+  const currentQuestion = question
     ? ({
-        ...snapshot.currentQuestion,
-        media: normalizeQuestionMedia(snapshot.currentQuestion.media),
-        revealMedia: normalizeQuestionMedia(
-          snapshot.currentQuestion.revealMedia,
-        ),
+        ...question,
+        media: attachMediaUrl(question.media, urls),
+        revealMedia: attachMediaUrl(question.revealMedia, urls),
       } satisfies SessionSnapshot["currentQuestion"])
     : null
 
@@ -298,7 +381,7 @@ export const gameService = {
       .order("updated_at", { ascending: false })
 
     if (error) throw error
-    return (data ?? []).map(normalizeGameRecord)
+    return normalizeGameRecords((data ?? []) as GameWithQuestionsRow[])
   },
 
   async getGame(gameId: string) {
@@ -310,7 +393,8 @@ export const gameService = {
       .single()
 
     if (error) throw error
-    return normalizeGameRecord(data)
+    const [game] = await normalizeGameRecords([data as GameWithQuestionsRow])
+    return game
   },
 
   async listOwnedGameStatuses(
@@ -471,42 +555,33 @@ export const gameService = {
 
     const kind = detectMediaKind(file)
     const dimensions = await readMediaDimensions(file, { kind })
-    const filePath = `${crypto.randomUUID()}-${sanitizeStorageFileName(file.name)}`
-    const { error } = await supabase.storage
-      .from(QUESTION_MEDIA_BUCKET)
-      .upload(filePath, file, {
-        cacheControl: "3600",
-        upsert: false,
-      })
-
-    if (error) throw error
-
-    const { data: userData, error: userError } = await supabase.auth.getUser()
-    if (userError || !userData.user) {
-      await supabase.storage.from(QUESTION_MEDIA_BUCKET).remove([filePath])
-      throw userError ?? new Error("Sign in is required to upload media.")
+    const body = new FormData()
+    body.append("file", file, file.name)
+    if (dimensions) {
+      body.append("width", String(dimensions.width))
+      body.append("height", String(dimensions.height))
     }
 
-    const { error: assetError } = await supabase.from("media_assets").insert({
-      owner_id: userData.user.id,
-      bucket_id: QUESTION_MEDIA_BUCKET,
-      object_path: filePath,
-      status: "ready",
-    })
+    const { data, error } = await supabase.functions.invoke(
+      "upload-question-media",
+      { body },
+    )
 
-    if (assetError) {
-      await supabase.storage.from(QUESTION_MEDIA_BUCKET).remove([filePath])
-      throw assetError
+    if (error) throw await readFunctionError(error)
+
+    const asset = data as Partial<UploadedQuestionMedia> | null
+    if (!asset?.path || !asset.kind) {
+      throw new Error("Media upload returned an invalid response.")
     }
 
-    const { data } = supabase.storage
-      .from(QUESTION_MEDIA_BUCKET)
-      .getPublicUrl(filePath)
+    // The bucket is private, so a playable URL has to be minted rather than
+    // derived. Resolving here keeps the builder preview working immediately.
+    const urls = await resolveMediaUrls([asset.path])
 
     return {
-      kind,
-      path: filePath,
-      publicUrl: data.publicUrl,
+      kind: asset.kind,
+      path: asset.path,
+      ...(urls.get(asset.path) ? { publicUrl: urls.get(asset.path) } : {}),
       ...(dimensions ?? {}),
     } satisfies QuestionMedia
   },
@@ -514,9 +589,11 @@ export const gameService = {
   async deleteUploadedMedia(paths: string[]) {
     if (!paths.length) return
 
-    const { error } = await supabase.storage
-      .from(QUESTION_MEDIA_BUCKET)
-      .remove(paths)
+    // The browser cannot reach R2. Marking the asset frees the account's quota
+    // now and hands the object itself to the reaper.
+    const { error } = await supabase.rpc("schedule_media_deletion", {
+      p_paths: paths,
+    })
 
     if (error) throw error
   },
