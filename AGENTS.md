@@ -57,6 +57,10 @@ Run `npm run type-check`, `npm run lint`, and `npm run format` after code change
 
 ## Supabase Notes
 
+- Make every schema change through a committed migration, including exploratory
+  changes; never leave changes applied only through the Dashboard SQL editor.
+  The `Database` GitHub Actions workflow enforces this by rebuilding the local
+  database from migrations and checking the production schema invariants.
 - Anonymous auth is expected and is initialized on app mount.
 - Invite links point to live sessions, not reusable quiz templates.
 - Resume behavior is same-browser only and relies on both Supabase auth persistence and local storage.
