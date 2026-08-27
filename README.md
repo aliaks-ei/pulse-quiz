@@ -96,6 +96,8 @@ npx supabase secrets set \
 
 The `upload-question-media` Edge Function is the only writer. It validates the file signature against the declared type, enforces the 25 MB per-file limit, and rejects the upload when the account is over its storage quota. The quota is `private.plan_definitions.max_storage_bytes`, 500 MB on the free plan, so raising it is a row update rather than a deploy.
 
+The `media-url` Edge Function is the only reader. It presigns R2 objects for two hours after `public.authorize_media_paths` confirms the caller owns the quiz or holds a player row in one of its unfinished sessions. Assets still held in Supabase Storage come back in the response's `legacy` list, and `src/lib/mediaUrl.ts` falls back to the legacy public URL for those and logs each fallback.
+
 ## Edge Functions
 
 Deploy the tracked functions after setting required secrets:
@@ -104,9 +106,10 @@ Deploy the tracked functions after setting required secrets:
 npx supabase functions deploy translate-quiz
 npx supabase functions deploy upload-avatar
 npx supabase functions deploy upload-question-media
+npx supabase functions deploy media-url
 ```
 
-`translate-quiz` requires `OPENAI_API_KEY`; `upload-question-media` requires the `R2_*` secrets above. Both, along with `upload-avatar`, use the Supabase runtime service-role secret and must retain JWT verification.
+`translate-quiz` requires `OPENAI_API_KEY`; `upload-question-media` and `media-url` require the `R2_*` secrets above. Both, along with `upload-avatar`, use the Supabase runtime service-role secret and must retain JWT verification.
 
 ## Verification
 

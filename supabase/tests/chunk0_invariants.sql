@@ -13,6 +13,7 @@ declare
   ];
   actual_private_tables text[];
   expected_browser_rpcs text[] := array[
+    'authorize_media_paths(text[],uuid)',
     'cancel_session(uuid)',
     'consume_translation_quota()',
     'create_live_session(uuid)',
