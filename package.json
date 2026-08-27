@@ -14,7 +14,8 @@
     "format": "prettier . --write --ignore-unknown",
     "prepare": "husky",
     "type-check": "vue-tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "media:reap-orphans": "node --import tsx --env-file-if-exists=.env scripts/reap-orphans.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",
@@ -51,6 +52,7 @@
     "rollup-plugin-visualizer": "^6.0.11",
     "supabase": "2.114.0",
     "tailwindcss": "^4.1.3",
+    "tsx": "4.20.6",
     "typescript": "~5.7.2",
     "typescript-eslint": "8.59.0",
     "vite": "^6.2.2",
