@@ -9,6 +9,6 @@
     "secrets": "wrangler secret list"
   },
   "devDependencies": {
-    "wrangler": "4.86.0"
+    "wrangler": "4.127.0"
   }
 }
