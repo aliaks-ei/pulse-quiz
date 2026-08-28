@@ -23,7 +23,7 @@
     "@vueuse/core": "^14.2.1",
     "clsx": "^2.1.1",
     "lucide-vue-next": "^0.511.0",
-    "motion-v": "^2.2.0",
+    "motion-v": "^2.4.0",
     "pinia": "^3.0.1",
     "qrcode": "^1.5.4",
     "swiper": "^12.2.0",
