@@ -1,0 +1,14 @@
+{
+  "name": "pulse-quiz-media-reaper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "logs": "wrangler tail",
+    "secrets": "wrangler secret list"
+  },
+  "devDependencies": {
+    "wrangler": "4.86.0"
+  }
+}

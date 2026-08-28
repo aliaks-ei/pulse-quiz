@@ -141,10 +141,14 @@ Postgres cannot reach R2, so no job deletes an object. `workers/media-reaper` is
 
 ```bash
 cd workers/media-reaper
-npx wrangler secret put SUPABASE_URL
+npm install
+npx wrangler login
+npx wrangler secret put SUPABASE_URL              # https://<project-ref>.supabase.co
 npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
-npx wrangler deploy
+npm run deploy
 ```
+
+Wrangler is pinned in this directory's own `package.json` rather than the app's, so deploying the Worker never enters the app's install or CI. `npm run logs` tails a live run.
 
 ## Edge Functions
 
