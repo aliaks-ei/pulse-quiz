@@ -55,7 +55,7 @@ Vue browser → Supabase Auth / RPC / Realtime / Storage
 
    Never expose `SUPABASE_SERVICE_ROLE_KEY` or `OPENAI_API_KEY` in a Vite environment variable. Configure them only as Supabase Edge Function secrets.
 
-   Turnstile guards the two auth endpoints that create users: anonymous sign-ins and magic links. The template ships Cloudflare's "always passes" test sitekey, which pairs with the test secret in `supabase/config.toml`, so a local stack works out of the box. For a deployment, create a Turnstile widget, put its sitekey in `VITE_TURNSTILE_SITE_KEY` and its secret under **Authentication -> Attack Protection** in the Supabase Dashboard. Leaving the sitekey blank disables the captcha client-side, so also turn it off in the Dashboard.
+   Turnstile guards the two auth endpoints that create users: anonymous sign-ins and magic links. The template ships Cloudflare's "always passes" test sitekey, which pairs with the test secret in `supabase/config.toml`, so a local stack works out of the box. For a deployment, create a Turnstile widget, put its sitekey in `VITE_TURNSTILE_SITE_KEY` and its secret under **Authentication -> Attack Protection** in the Supabase Dashboard. Set the sitekey and redeploy before enabling the captcha in the Dashboard, or every anonymous sign-in is rejected in between. Leaving the sitekey blank disables the captcha client-side, so also turn it off in the Dashboard.
 
    Anonymous users are only minted on the routes that need one: `/join`, `/join/:inviteCode`, and the live session routes. The landing page, the auth pages and 404s adopt an existing session but never create one, so a crawler hitting `/` costs nothing.
 
