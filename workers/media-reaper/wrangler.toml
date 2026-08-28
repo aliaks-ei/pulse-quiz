@@ -2,6 +2,10 @@ name = "pulse-quiz-media-reaper"
 main = "src/index.ts"
 compatibility_date = "2026-08-01"
 
+# Cron only: the Worker has no fetch handler, so a workers.dev URL would serve
+# nothing. This also stops the deploy asking for a workers.dev subdomain.
+workers_dev = false
+
 # Twenty minutes after the last pg_cron retention job marks its assets, so a
 # night's markings are reaped the same night.
 [triggers]
