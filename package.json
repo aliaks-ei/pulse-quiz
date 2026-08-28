@@ -19,7 +19,7 @@
     "media:migrate-to-r2": "node --import tsx --env-file-if-exists=.env scripts/migrate-media-to-r2.ts"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.49.4",
+    "@supabase/supabase-js": "^2.112.4",
     "@vueuse/core": "^14.2.1",
     "clsx": "^2.1.1",
     "lucide-vue-next": "^0.511.0",
