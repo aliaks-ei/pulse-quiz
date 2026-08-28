@@ -190,7 +190,11 @@ begin
   insert into public.live_sessions (
     id, game_id, title, invite_code, created_by
   ) values (
-    test_session_id, test_game_id, 'Chunk 0 verification', 'CHK000', test_user_id
+    -- The generator, not a literal: a code it produces must satisfy the
+    -- table's own check constraint, which is what broke room creation when
+    -- the generator was widened and the constraint was left at 6 characters.
+    test_session_id, test_game_id, 'Chunk 0 verification',
+    public.generate_invite_code(), test_user_id
   );
 
   if not exists (
