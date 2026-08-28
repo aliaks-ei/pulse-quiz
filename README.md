@@ -168,6 +168,14 @@ npx supabase functions deploy media-url
 
 `translate-quiz` requires `OPENAI_API_KEY`; `upload-question-media` and `media-url` require the `R2_*` secrets above. Both, along with `upload-avatar`, use the Supabase runtime service-role secret and must retain JWT verification.
 
+## Hosting
+
+Netlify serves the built SPA. `netlify.toml` carries the build command, the publish directory, the Node version and the response headers, so a fork gets the same deployment without configuring anything in the dashboard. `public/_redirects` holds the SPA fallback that keeps deep links such as `/join/ABCD` working on a hard refresh.
+
+Every response ships a Content Security Policy, `frame-ancestors 'none'` with a matching `X-Frame-Options`, HSTS, `Referrer-Policy`, `Permissions-Policy` and `X-Content-Type-Options`. The policy allowlists three third-party origins: `*.supabase.co` for Auth, RPC, Realtime and Storage, `*.r2.cloudflarestorage.com` for presigned question media, and `challenges.cloudflare.com` for the Turnstile script and its widget iframe. Origins are wildcarded per provider rather than pinned to one project, so pointing `VITE_SUPABASE_URL` at another project needs no edit here.
+
+Turnstile is the part that fails quietly: drop `challenges.cloudflare.com` from `script-src` or `frame-src` and every anonymous sign-in breaks in production, while local development, where the captcha is optional, stays green.
+
 ## Verification
 
 ```bash
@@ -181,7 +189,7 @@ npm run build
 ## Production checklist
 
 - Apply migrations to a staging project before production.
-- Configure Auth redirect URLs, CAPTCHA, SMTP, custom domain, TLS and security headers at the host.
+- Configure Auth redirect URLs, CAPTCHA, SMTP, custom domain and TLS. Security headers ship in `netlify.toml`; check the deployed site on securityheaders.com after a domain change.
 - Keep production and staging Supabase projects separate.
 - Set OpenAI quotas and spend alerts.
 - Enable GitHub branch protection, Dependabot, secret scanning, push protection and code scanning before opening the repository publicly.

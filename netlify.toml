@@ -1,0 +1,47 @@
+# Netlify build settings and response headers for the SPA.
+#
+# The deployment used to live only in the Netlify dashboard. It lives here now,
+# so a fork gets the same build, the same SPA fallback, and the same security
+# headers without anyone clicking through a UI.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# The SPA fallback stays in public/_redirects, so there is one rule and not two.
+
+[[headers]]
+  for = "/*"
+
+  [headers.values]
+    # Origins are wildcarded per provider rather than pinned to one project.
+    # A fork points VITE_SUPABASE_URL at its own Supabase project and its own
+    # R2 account, and this file keeps working with no edit.
+    #
+    #   *.supabase.co               Auth, RPC, Realtime (wss), Storage, Edge Functions
+    #   *.r2.cloudflarestorage.com  presigned question media
+    #   challenges.cloudflare.com   Turnstile: the script and the widget iframe
+    #
+    # style-src keeps 'unsafe-inline' because Google Fonts serves a stylesheet
+    # and Swiper injects styles at runtime. Step 17 self-hosts Manrope and step
+    # 19 drops Swiper; tighten this once both have landed.
+    Content-Security-Policy = "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://*.supabase.co https://*.r2.cloudflarestorage.com; media-src 'self' blob: https://*.supabase.co https://*.r2.cloudflarestorage.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.r2.cloudflarestorage.com https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; manifest-src 'self'"
+    # frame-ancestors covers modern browsers; this covers the rest.
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    # No preload: that is a submission to a browser list and hard to undo on a
+    # custom domain. The max-age alone is what securityheaders.com checks.
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    Permissions-Policy = "accelerometer=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+    Cross-Origin-Opener-Policy = "same-origin"
+
+# Vite fingerprints every file under /assets, so they can never go stale.
+[[headers]]
+  for = "/assets/*"
+
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
