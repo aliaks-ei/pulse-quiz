@@ -12,7 +12,9 @@ export interface AuthBootstrapClient {
       session: AuthSession | null
     }
   }>
-  signInAnonymously: () => Promise<{
+  signInAnonymously: (options?: {
+    options?: { captchaToken?: string }
+  }) => Promise<{
     data: {
       session?: AuthSession | null
       user: {
@@ -28,23 +30,30 @@ export interface AuthBootstrapClient {
 export interface AuthBootstrapResult {
   session: AuthSession | null
   userId: string | null
-  didSignInAnonymously: boolean
 }
 
-export async function bootstrapAuthSession(
-  client: AuthBootstrapClient,
+// Reads whatever session the browser already holds. Never mints a user, so it
+// is safe on routes a crawler or a first-time visitor can reach.
+export async function restoreAuthSession(
+  client: Pick<AuthBootstrapClient, "getSession">,
 ): Promise<AuthBootstrapResult> {
   const { data } = await client.getSession()
 
-  if (data.session) {
-    return {
-      session: data.session,
-      userId: data.session.user.id,
-      didSignInAnonymously: false,
-    }
+  return {
+    session: data.session,
+    userId: data.session?.user.id ?? null,
   }
+}
 
-  const { data: signInData, error } = await client.signInAnonymously()
+// Mints the anonymous user the RPC surface needs. Only call it on routes that
+// cannot work without an identity: joining a room, and live session routes.
+export async function signInAnonymously(
+  client: Pick<AuthBootstrapClient, "getSession" | "signInAnonymously">,
+  captchaToken?: string,
+): Promise<AuthBootstrapResult> {
+  const { data: signInData, error } = await client.signInAnonymously(
+    captchaToken ? { options: { captchaToken } } : undefined,
+  )
   if (error) throw error
 
   const session = signInData.session ?? (await client.getSession()).data.session
@@ -52,6 +61,5 @@ export async function bootstrapAuthSession(
   return {
     session,
     userId: session?.user.id ?? signInData.user?.id ?? null,
-    didSignInAnonymously: true,
   }
 }

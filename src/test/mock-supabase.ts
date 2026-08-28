@@ -47,6 +47,7 @@ interface MockSupabaseState {
     rpc: RecordedCall[]
     from: RecordedCall[]
     storage: RecordedCall[]
+    auth: RecordedCall[]
     removeChannel: MockChannel[]
   }
 }
@@ -73,7 +74,7 @@ function freshState(): MockSupabaseState {
     },
     channels: new Map(),
     functions: new Map(),
-    calls: { rpc: [], from: [], storage: [], removeChannel: [] },
+    calls: { rpc: [], from: [], storage: [], auth: [], removeChannel: [] },
   }
 }
 
@@ -88,6 +89,9 @@ export const mockCalls = {
   },
   get storage() {
     return state.calls.storage
+  },
+  get auth() {
+    return state.calls.auth
   },
   get removeChannel() {
     return state.calls.removeChannel
@@ -273,13 +277,15 @@ export const supabaseMock = {
     getSession() {
       return Promise.resolve(state.auth.getSession)
     },
-    signInAnonymously() {
+    signInAnonymously(params?: unknown) {
+      state.calls.auth.push({ name: "signInAnonymously", params })
       return Promise.resolve(state.auth.signInAnonymously)
     },
     signOut() {
       return Promise.resolve(state.auth.signOut)
     },
-    signInWithOtp() {
+    signInWithOtp(params?: unknown) {
+      state.calls.auth.push({ name: "signInWithOtp", params })
       return Promise.resolve(state.auth.signInWithOtp)
     },
     signInWithOAuth() {

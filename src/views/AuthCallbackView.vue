@@ -30,7 +30,7 @@ async function finishSignIn() {
   error.value = null
 
   try {
-    await authStore.bootstrap()
+    await authStore.restoreSession()
     await authStore.waitForHostSession(8000)
     await router.replace(nextPath.value)
   } catch (authError) {

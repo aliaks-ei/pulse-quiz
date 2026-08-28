@@ -29,6 +29,7 @@ const NotFoundView = () => import("@/views/NotFoundView.vue")
 declare module "vue-router" {
   interface RouteMeta {
     requiresHostAuth?: boolean
+    requiresIdentity?: boolean
     shell?: "landing" | "immersive" | "product"
     titleKey?: PageTitleKey
     sessionRoute?: boolean
@@ -114,13 +115,18 @@ export const router = createRouter({
     {
       path: "/join",
       component: JoinRoomView,
-      meta: { shell: "immersive", titleKey: pageTitleKeys.join },
+      meta: {
+        requiresIdentity: true,
+        shell: "immersive",
+        titleKey: pageTitleKeys.join,
+      },
     },
     {
       path: "/join/:inviteCode",
       component: JoinSessionView,
       props: true,
       meta: {
+        requiresIdentity: true,
         shell: "immersive",
         titleKey: pageTitleKeys.join,
         hideTopChrome: true,
@@ -173,7 +179,15 @@ export const router = createRouter({
 
 router.beforeEach(async (to) => {
   const authStore = useAuthStore()
-  await authStore.bootstrap()
+
+  // Only mint an anonymous user where an identity is actually required: every
+  // RPC is granted to `authenticated` alone, so joining and playing need one.
+  // Landing, auth and not-found routes just adopt whatever session exists.
+  if (to.meta.requiresIdentity || to.meta.sessionRoute) {
+    await authStore.ensureIdentity()
+  } else {
+    await authStore.restoreSession()
+  }
 
   if (to.path === "/auth" && authStore.isHostAuthenticated) {
     return {

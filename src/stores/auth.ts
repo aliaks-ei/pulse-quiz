@@ -3,7 +3,8 @@ import { defineStore } from "pinia"
 import { computed, ref } from "vue"
 
 import { translate } from "@/i18n"
-import { bootstrapAuthSession } from "@/lib/authBootstrap"
+import { restoreAuthSession, signInAnonymously } from "@/lib/authBootstrap"
+import { getCaptchaToken } from "@/lib/turnstile"
 import { supabase } from "@/services/supabase"
 
 function resolveAppUrl() {
@@ -29,7 +30,8 @@ export const useAuthStore = defineStore("auth", () => {
   const session = ref<Session | null>(null)
   const isReady = ref(false)
   let hasBoundAuthListener = false
-  let bootstrapPromise: Promise<void> | null = null
+  let restorePromise: Promise<void> | null = null
+  let identityPromise: Promise<void> | null = null
   let hostSessionWaiters: Array<{
     resolve: () => void
     reject: (reason?: unknown) => void
@@ -53,41 +55,62 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
-  async function ensureAnonymousSession() {
-    const result = await bootstrapAuthSession(supabase.auth)
-    syncSession(result.session as Session | null)
+  function bindAuthListener() {
+    if (hasBoundAuthListener) return
+
+    supabase.auth.onAuthStateChange((_event, nextSession) => {
+      syncSession(nextSession)
+    })
+    hasBoundAuthListener = true
   }
 
-  async function bootstrap() {
+  // Adopts an existing session without creating one. Every route runs this.
+  async function restoreSession() {
     if (isReady.value) return
-    if (bootstrapPromise) return bootstrapPromise
+    if (restorePromise) return restorePromise
 
-    bootstrapPromise = (async () => {
+    restorePromise = (async () => {
       try {
-        await ensureAnonymousSession()
-
-        if (!hasBoundAuthListener) {
-          supabase.auth.onAuthStateChange((_event, nextSession) => {
-            syncSession(nextSession)
-          })
-          hasBoundAuthListener = true
-        }
-
+        const result = await restoreAuthSession(supabase.auth)
+        syncSession(result.session as Session | null)
+        bindAuthListener()
         isReady.value = true
       } finally {
-        bootstrapPromise = null
+        restorePromise = null
       }
     })()
 
-    return bootstrapPromise
+    return restorePromise
+  }
+
+  // Guarantees a user id. Only routes that call an RPC need this, because the
+  // whole RPC surface is granted to `authenticated` and nothing to `anon`.
+  async function ensureIdentity() {
+    await restoreSession()
+    if (session.value) return
+    if (identityPromise) return identityPromise
+
+    identityPromise = (async () => {
+      try {
+        const captchaToken = await getCaptchaToken()
+        const result = await signInAnonymously(supabase.auth, captchaToken)
+        syncSession(result.session as Session | null)
+      } finally {
+        identityPromise = null
+      }
+    })()
+
+    return identityPromise
   }
 
   async function signInWithMagicLink(email: string, next = "/library") {
     const normalizedEmail = email.trim().toLowerCase()
+    const captchaToken = await getCaptchaToken()
     const { error } = await supabase.auth.signInWithOtp({
       email: normalizedEmail,
       options: {
         emailRedirectTo: buildAuthCallbackUrl(next),
+        captchaToken,
       },
     })
 
@@ -105,11 +128,13 @@ export const useAuthStore = defineStore("auth", () => {
     if (error) throw error
   }
 
-  async function signOutToAnonymous() {
+  // Drops the session outright. The next route that needs an identity mints a
+  // fresh anonymous user; signing out should not mint one on its own.
+  async function signOut() {
     const { error } = await supabase.auth.signOut()
     if (error) throw error
 
-    await ensureAnonymousSession()
+    syncSession(null)
   }
 
   async function waitForHostSession(timeoutMs = 10000) {
@@ -147,10 +172,11 @@ export const useAuthStore = defineStore("auth", () => {
     isAnonymous,
     isHostAuthenticated,
     isReady,
-    bootstrap,
+    restoreSession,
+    ensureIdentity,
     signInWithMagicLink,
     signInWithGoogle,
-    signOutToAnonymous,
+    signOut,
     waitForHostSession,
   }
 })

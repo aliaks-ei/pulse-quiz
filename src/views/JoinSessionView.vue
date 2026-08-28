@@ -53,7 +53,7 @@ const showResumeHint = computed(
 )
 
 onMounted(async () => {
-  await authStore.bootstrap()
+  await authStore.ensureIdentity()
   playerStore.hydrateForInvite(inviteCode.value)
   await loadPlayerAvatars()
   isLoadingInvite.value = true

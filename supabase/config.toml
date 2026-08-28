@@ -155,11 +155,16 @@ token_verifications = 30
 # Number of Web3 logins that can be made in a 5 minute interval per IP address.
 web3 = 30
 
-# Configure one of the supported captcha providers: `hcaptcha`, `turnstile`.
-# [auth.captcha]
-# enabled = true
-# provider = "hcaptcha"
-# secret = ""
+# Cloudflare Turnstile guards the endpoints that mint users: anonymous sign-ins
+# and email OTP. The default below is Cloudflare's public "always passes" test
+# secret, so a local stack and CI work offline of a real widget; pair it with
+# the matching test sitekey in VITE_TURNSTILE_SITE_KEY. Production sets its own
+# secret in the Supabase Dashboard, and must never receive this file's value.
+[auth.captcha]
+enabled = true
+provider = "turnstile"
+# Cloudflare's documented "always passes" test secret, not a credential.
+secret = "1x0000000000000000000000000000000AA"
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.

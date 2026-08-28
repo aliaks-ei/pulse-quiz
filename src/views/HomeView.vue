@@ -37,7 +37,7 @@ function mobileNavLinkClasses(solid = false) {
 }
 
 onMounted(async () => {
-  await authStore.bootstrap()
+  await authStore.restoreSession()
 
   if (!authStore.isHostAuthenticated) return
 

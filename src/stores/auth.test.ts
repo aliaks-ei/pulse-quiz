@@ -5,9 +5,19 @@ vi.mock("@/services/supabase", async () => {
   return { supabase: mod.supabaseMock, isSupabaseConfigured: true }
 })
 
+const getCaptchaToken = vi.fn(
+  async (): Promise<string | undefined> => undefined,
+)
+
+vi.mock("@/lib/turnstile", () => ({
+  getCaptchaToken: () => getCaptchaToken(),
+  getTurnstileSiteKey: () => null,
+}))
+
 import { useAuthStore } from "@/stores/auth"
 import {
   emitAuthStateChange,
+  mockCalls,
   resetMockSupabase,
   setAuthSession,
   setSignInAnonymously,
@@ -26,18 +36,20 @@ describe("auth store", () => {
   beforeEach(() => {
     withTestPinia()
     resetMockSupabase()
+    getCaptchaToken.mockReset()
+    getCaptchaToken.mockResolvedValue(undefined)
   })
 
   afterEach(() => {
     vi.useRealTimers()
   })
 
-  describe("bootstrap", () => {
+  describe("restoreSession", () => {
     it("adopts an existing anonymous session and becomes ready", async () => {
       setAuthSession({ user: anonUser })
       const store = useAuthStore()
 
-      await store.bootstrap()
+      await store.restoreSession()
 
       expect(store.isReady).toBe(true)
       expect(store.userId).toBe("anon-1")
@@ -45,24 +57,22 @@ describe("auth store", () => {
       expect(store.isHostAuthenticated).toBe(false)
     })
 
-    it("signs in anonymously when no session exists", async () => {
+    it("never mints a user when no session exists", async () => {
       setAuthSession(null)
-      setSignInAnonymously({
-        data: { session: { user: anonUser }, user: anonUser },
-      })
       const store = useAuthStore()
 
-      await store.bootstrap()
+      await store.restoreSession()
 
-      expect(store.userId).toBe("anon-1")
       expect(store.isReady).toBe(true)
+      expect(store.userId).toBeNull()
+      expect(mockCalls.auth).toEqual([])
     })
 
     it("exposes host identity for a non-anonymous session", async () => {
       setAuthSession({ user: hostUser })
       const store = useAuthStore()
 
-      await store.bootstrap()
+      await store.restoreSession()
 
       expect(store.isHostAuthenticated).toBe(true)
       expect(store.userEmail).toBe("host@example.com")
@@ -71,8 +81,51 @@ describe("auth store", () => {
     it("is idempotent once ready", async () => {
       setAuthSession({ user: anonUser })
       const store = useAuthStore()
-      await store.bootstrap()
-      await expect(store.bootstrap()).resolves.toBeUndefined()
+      await store.restoreSession()
+      await expect(store.restoreSession()).resolves.toBeUndefined()
+    })
+  })
+
+  describe("ensureIdentity", () => {
+    it("signs in anonymously when no session exists", async () => {
+      setAuthSession(null)
+      setSignInAnonymously({
+        data: { session: { user: anonUser }, user: anonUser },
+      })
+      const store = useAuthStore()
+
+      await store.ensureIdentity()
+
+      expect(store.userId).toBe("anon-1")
+      expect(store.isReady).toBe(true)
+    })
+
+    it("keeps an existing session instead of minting a second user", async () => {
+      setAuthSession({ user: hostUser })
+      const store = useAuthStore()
+
+      await store.ensureIdentity()
+
+      expect(store.userId).toBe("host-1")
+      expect(mockCalls.auth).toEqual([])
+    })
+
+    it("passes a captcha token to the anonymous sign-in", async () => {
+      setAuthSession(null)
+      setSignInAnonymously({
+        data: { session: { user: anonUser }, user: anonUser },
+      })
+      getCaptchaToken.mockResolvedValue("captcha-token")
+      const store = useAuthStore()
+
+      await store.ensureIdentity()
+
+      expect(mockCalls.auth).toEqual([
+        {
+          name: "signInAnonymously",
+          params: { options: { captchaToken: "captcha-token" } },
+        },
+      ])
     })
   })
 
@@ -80,7 +133,7 @@ describe("auth store", () => {
     it("resolves immediately when already host-authenticated", async () => {
       setAuthSession({ user: hostUser })
       const store = useAuthStore()
-      await store.bootstrap()
+      await store.restoreSession()
 
       await expect(store.waitForHostSession()).resolves.toBeUndefined()
     })
@@ -88,7 +141,7 @@ describe("auth store", () => {
     it("resolves when an auth state change upgrades to a host user", async () => {
       setAuthSession({ user: anonUser })
       const store = useAuthStore()
-      await store.bootstrap()
+      await store.restoreSession()
 
       const waiter = store.waitForHostSession(10_000)
       emitAuthStateChange("SIGNED_IN", { user: hostUser })
@@ -99,7 +152,7 @@ describe("auth store", () => {
     it("rejects after the timeout elapses", async () => {
       setAuthSession({ user: anonUser })
       const store = useAuthStore()
-      await store.bootstrap()
+      await store.restoreSession()
 
       vi.useFakeTimers()
       const waiter = store.waitForHostSession(5000)
@@ -109,29 +162,49 @@ describe("auth store", () => {
     })
   })
 
-  describe("signOutToAnonymous", () => {
-    it("signs out then re-establishes an anonymous session", async () => {
+  describe("signInWithMagicLink", () => {
+    it("sends the captcha token alongside the redirect", async () => {
+      getCaptchaToken.mockResolvedValue("captcha-token")
+      const store = useAuthStore()
+
+      await store.signInWithMagicLink("Host@Example.com ", "/library")
+
+      expect(mockCalls.auth).toEqual([
+        {
+          name: "signInWithOtp",
+          params: {
+            email: "host@example.com",
+            options: {
+              emailRedirectTo: expect.stringContaining("/auth/callback"),
+              captchaToken: "captcha-token",
+            },
+          },
+        },
+      ])
+    })
+  })
+
+  describe("signOut", () => {
+    it("clears the session without minting a replacement", async () => {
       setAuthSession({ user: hostUser })
       const store = useAuthStore()
-      await store.bootstrap()
+      await store.restoreSession()
       expect(store.isHostAuthenticated).toBe(true)
 
-      setAuthSession({ user: anonUser })
-      await store.signOutToAnonymous()
+      await store.signOut()
 
-      expect(store.isAnonymous).toBe(true)
+      expect(store.userId).toBeNull()
       expect(store.isHostAuthenticated).toBe(false)
+      expect(mockCalls.auth).toEqual([])
     })
 
     it("throws when sign-out fails", async () => {
       setAuthSession({ user: hostUser })
       const store = useAuthStore()
-      await store.bootstrap()
+      await store.restoreSession()
 
       setSignOutError(new Error("sign-out failed"))
-      await expect(store.signOutToAnonymous()).rejects.toThrow(
-        "sign-out failed",
-      )
+      await expect(store.signOut()).rejects.toThrow("sign-out failed")
     })
   })
 })

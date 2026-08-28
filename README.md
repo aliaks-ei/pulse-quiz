@@ -51,8 +51,13 @@ Vue browser → Supabase Auth / RPC / Realtime / Storage
    | `VITE_SUPABASE_URL`                     | Supabase project URL                              |
    | `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Browser publishable key                           |
    | `VITE_APP_URL`                          | App origin, defaulting to `http://localhost:5175` |
+   | `VITE_TURNSTILE_SITE_KEY`               | Cloudflare Turnstile sitekey, blank to skip       |
 
    Never expose `SUPABASE_SERVICE_ROLE_KEY` or `OPENAI_API_KEY` in a Vite environment variable. Configure them only as Supabase Edge Function secrets.
+
+   Turnstile guards the two auth endpoints that create users: anonymous sign-ins and magic links. The template ships Cloudflare's "always passes" test sitekey, which pairs with the test secret in `supabase/config.toml`, so a local stack works out of the box. For a deployment, create a Turnstile widget, put its sitekey in `VITE_TURNSTILE_SITE_KEY` and its secret under **Authentication -> Attack Protection** in the Supabase Dashboard. Leaving the sitekey blank disables the captcha client-side, so also turn it off in the Dashboard.
+
+   Anonymous users are only minted on the routes that need one: `/join`, `/join/:inviteCode`, and the live session routes. The landing page, the auth pages and 404s adopt an existing session but never create one, so a crawler hitting `/` costs nothing.
 
 4. Start the local Supabase stack and apply migrations:
 

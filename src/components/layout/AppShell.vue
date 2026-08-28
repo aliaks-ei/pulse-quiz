@@ -101,7 +101,7 @@ async function signOut() {
   isSigningOut.value = true
 
   try {
-    await authStore.signOutToAnonymous()
+    await authStore.signOut()
     await router.push("/")
   } finally {
     isSigningOut.value = false
