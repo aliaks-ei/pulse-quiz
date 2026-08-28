@@ -25,6 +25,10 @@ declare
     'get_server_time()',
     'get_session_snapshot(uuid,uuid)',
     'host_advance_session_phase(uuid,session_phase)',
+    -- Called by RLS policies, not by the browser. See the policy
+    -- dependency check below.
+    'is_game_owner(uuid)',
+    'is_session_participant(uuid)',
     'join_or_resume_session(text,text,text,uuid,uuid)',
     'list_owned_games_with_status(integer,integer)',
     'list_past_sessions(integer,integer)',
@@ -101,6 +105,44 @@ begin
   ) then
     raise exception 'Public or anonymous role can execute a public function';
   end if;
+end;
+$$;
+
+-- An RLS policy expression runs as the role it restricts, so every function a
+-- policy names must be executable by that role. Revoking execute in bulk and
+-- re-granting only the RPC entry points broke exactly this and nothing else,
+-- and the grant-set assertion above could not see it.
+do $$
+declare
+  gap record;
+begin
+  for gap in
+    select
+      relation.relname as table_name,
+      policy.polname as policy_name,
+      procedure.oid::regprocedure::text as function_name,
+      grantee.rolname as role_name
+    from pg_policy policy
+    join pg_class relation on relation.oid = policy.polrelid
+    join pg_namespace namespace on namespace.oid = relation.relnamespace
+    cross join lateral unnest(policy.polroles) as policy_role(oid)
+    join pg_roles grantee on grantee.oid = policy_role.oid
+    join pg_proc procedure on true
+    join pg_namespace function_namespace
+      on function_namespace.oid = procedure.pronamespace
+    where namespace.nspname = 'public'
+      and function_namespace.nspname = 'public'
+      and policy_role.oid <> 0
+      and (
+        coalesce(pg_get_expr(policy.polqual, policy.polrelid), '')
+        || ' '
+        || coalesce(pg_get_expr(policy.polwithcheck, policy.polrelid), '')
+      ) like '%' || procedure.proname || '(%'
+      and not has_function_privilege(grantee.rolname, procedure.oid, 'execute')
+  loop
+    raise exception 'Policy % on % calls % which % cannot execute',
+      gap.policy_name, gap.table_name, gap.function_name, gap.role_name;
+  end loop;
 end;
 $$;
 
